@@ -137,6 +137,30 @@ curl -s -X POST localhost:8780/api/v1/quote -H 'Content-Type: application/json' 
 Every response uses one envelope: `{"ok":true,"data":...,"meta":...}` or
 `{"ok":false,"error":{"code":...,"message":...}}`.
 
+## Renewal Radar
+
+A shopping agent that only helps you *spend* is half a product. The same
+transaction history that proves an agent can pay also shows what it pays for
+month after month. **Renewal Radar** (`/renewals`, or
+`python -m paypilot renewals`) reads it the other way round:
+
+- **A 60-day calendar** of predicted charges, each from that merchant's own
+  cadence (weekly / monthly / quarterly / yearly).
+- **A verdict per subscription** — keep / review / cancel / renegotiate — each
+  with the amounts and dates that produced it: `PRICE_HIKE` (NETFLIX $15.49 →
+  $22.99), `DUPLICATE` (two identical $59.99 charges three days apart),
+  `DORMANT` (charged monthly, silent for months).
+- **A polite, ready-to-send nudge** per subscription. AI-written when a brain is
+  configured, template-written offline.
+
+Two deliberate refusals: it never flags a change that does not **persist** (so a
+seasonal spike is not a price hike), and it never predicts a date it cannot
+justify — an unexplained duplicate appears as a duplicate but gets **no**
+renewal date. Deterministic facts; only the wording can be AI-written.
+
+Savings are deliberately conservative: cancel counts at 100%, renegotiate 15%,
+review 30%.
+
 ## Demo scenarios
 
 `python -m paypilot demo` runs four scenarios that show the agent's full behavioural range:
@@ -211,13 +235,17 @@ paypilot/
 │   ├── web.py             # stdlib web demo UI
 │   ├── grid.py            # AG Grid policy audit console (/grid, /api/rows)
 │   ├── api.py             # REST API + OpenAPI serving (/api/v1/*, /docs)
-│   └── context.py         # agent-consumable API context
+│   ├── context.py         # agent-consumable API context
+│   └── renewals.py        # Renewal Radar: cadence, hikes, duplicates
 ├── examples/
 │   ├── catalog.csv        # 17 products across 5 categories
-│   └── requests.txt       # example natural-language requests
+│   ├── requests.txt       # example natural-language requests
+│   └── transactions.csv   # 42 transactions with planted hikes/duplicates
+├── PAYPILOT_DEMO_SCRIPT.md  # <3min video storyboard + YouTube metadata
+├── PAYPILOT_SUBMISSION.md   # Devpost submission text (copy-paste)
 ├── openapi.yaml           # OpenAPI 3.0.3 spec, served at /openapi.yaml
 ├── postman_collection.json
-├── eval.py                # 118 assertions, runs offline
+├── eval.py                # 171 assertions, runs offline
 ├── requirements.txt       # (empty - stdlib only)
 ├── .env.example
 ├── LICENSE                # MIT
