@@ -55,7 +55,8 @@ h2{font-size:16px;margin:0 0 8px}
 </style></head><body><div class="wrap">
 <header><h1>PayPilot</h1>
 <p>An AI shopping agent with policy guardrails. It reads your request, picks a product with evidence, checks spending policy <em>before</em> touching money, and pays with a real PayPal sandbox checkout.</p>
-<p><a href="/grid">Open the Policy Audit Grid &rarr;</a> <span class="mode">(every catalog item scored against the policy engine, in AG Grid)</span></p></header>
+<p><a href="/grid">Open the Policy Audit Grid &rarr;</a> <span class="mode">(every catalog item scored against the policy engine, in AG Grid)</span>
+&middot; <a href="/docs">API docs</a> <span class="mode">(OpenAPI 3.0.3 + Swagger UI)</span></p></header>
 <div class="card">
 <form method="post" action="/run">
 <label for="req">What should the agent buy?</label>
@@ -150,6 +151,19 @@ def make_handler(catalog_path, live):
     from .cli import SCENARIOS
     products_cache = load_catalog(catalog_path)
 
+    def make_agent(daily_spent=0.0):
+        brain = get_brain(prefer_llm=True)
+        if live:
+            paypal = PayPalClient(
+                client_id=os.environ.get("PAYPAL_CLIENT_ID", ""),
+                secret=os.environ.get("PAYPAL_SECRET", ""))
+        else:
+            paypal = PayPalClient(mock=MockPayPal())
+        agent = ShopAgent(products_cache, brain=brain, paypal=paypal,
+                          daily_spent=daily_spent)
+        agent.mode = "sandbox" if live else "mock"
+        return agent
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -160,10 +174,13 @@ def make_handler(catalog_path, live):
             self.end_headers()
             self.wfile.write(body.encode("utf-8"))
 
+        def _query(self):
+            return {k: v[0] for k, v in
+                    parse_qs(urlparse(self.path).query).items() if v}
+
         def _spent(self):
-            q = parse_qs(urlparse(self.path).query)
             try:
-                return max(0.0, float((q.get("spent") or ["0"])[0]))
+                return max(0.0, float(self._query().get("spent", "0")))
             except (TypeError, ValueError):
                 return 0.0
 
@@ -182,13 +199,45 @@ def make_handler(catalog_path, live):
                 self._send(render_grid_page(products_cache, Policy(),
                                             daily_spent=self._spent()))
                 return
+            if path.startswith("/openapi.yaml") or path.startswith("/openapi.yml"):
+                from .api import load_spec
+                self._send(load_spec(), ctype="application/yaml; charset=utf-8")
+                return
+            if path.startswith("/docs"):
+                from .api import render_docs
+                self._send(render_docs())
+                return
+            if path.startswith("/api/"):
+                from .api import dispatch, to_json
+                status, body = dispatch(products_cache, make_agent, live,
+                                        path, "GET", self._query(), None)
+                self._send(to_json(body), status, "application/json")
+                return
             page = _render_page("", "", "",
                                 mode="LIVE sandbox" if live else "mock (offline)")
             self._send(page)
 
         def do_POST(self):
             if not self.path.startswith("/run"):
-                self._send("not found", 404, "text/plain")
+                path = urlparse(self.path).path
+                if not path.startswith("/api/"):
+                    self._send("not found", 404, "text/plain")
+                    return
+                from .api import dispatch, to_json
+                n = int(self.headers.get("Content-Length", 0))
+                raw = self.rfile.read(n).decode("utf-8", errors="replace")
+                try:
+                    payload = json.loads(raw) if raw else {}
+                except ValueError:
+                    status, body = (400, {
+                        "ok": False,
+                        "error": {"code": "INVALID_JSON",
+                                  "message": "request body is not valid JSON"}})
+                    self._send(to_json(body), status, "application/json")
+                    return
+                status, body = dispatch(products_cache, make_agent, live,
+                                        path, "POST", {}, payload)
+                self._send(to_json(body), status, "application/json")
                 return
             n = int(self.headers.get("Content-Length", 0))
             form = parse_qs(self.rfile.read(n).decode("utf-8"))
