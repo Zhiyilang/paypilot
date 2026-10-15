@@ -1,5 +1,7 @@
 # PayPilot demo video — under 3 minutes, English
 
+**Rendered video:** `paypilot_demo.mp4` (repo root) — recorded from the four `python -m paypilot demo` scenarios, no editing needed. Upload it to YouTube/Vimeo and paste the link into the Devpost submission.
+
 Judges reject static mockups, so the video must show the app **actually running**.
 Everything below runs offline with zero credentials (PayPal mock mode), so you can
 record it right now.
