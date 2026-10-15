@@ -434,6 +434,171 @@ def main():
     finally:
         httpd.shutdown()
 
+    # ---- Renewal Radar -------------------------------------------------------
+    import contextlib
+    import io
+    from datetime import date as _date, timedelta as _td
+    from paypilot.cli import main as cli_main
+    from paypilot.renewals import (analyze, detect_subscriptions,
+                                   parse_paypal_transactions,
+                                   parse_transactions_csv, render_renewals_page,
+                                   savings_plan, renewal_calendar, write_nudges)
+
+    TXN_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "examples", "transactions.csv")
+    with open(TXN_CSV, encoding="utf-8") as f:
+        txns = parse_transactions_csv(f.read())
+    check("renewals_parses_transactions", len(txns) == 42, str(len(txns)))
+    TODAY = _date(2026, 10, 15)
+    a = analyze(txns, today=TODAY)
+    subs = {s["merchant"]: s for s in a["subscriptions"]}
+    check("renewals_finds_subscriptions", len(a["subscriptions"]) == 6,
+          str(sorted(subs)))
+
+    check("renewals_price_hike_flagged",
+          "PRICE_HIKE" in subs["NETFLIX.COM"]["flags"])
+    check("renewals_price_hike_verdict",
+          subs["NETFLIX.COM"]["verdict"] == "renegotiate")
+    check("renewals_price_hike_evidence_cites_amounts",
+          any("15.49" in e and "22.99" in e
+              for e in subs["NETFLIX.COM"]["evidence"]))
+    check("renewals_clean_subscription_is_keep",
+          subs["SPOTIFY USA"]["verdict"] == "keep"
+          and subs["SPOTIFY USA"]["flags"] == [])
+    check("renewals_duplicate_flagged",
+          "DUPLICATE" in subs["ADOBE SYSTEMS"]["flags"])
+    check("renewals_duplicate_verdict_cancel",
+          subs["ADOBE SYSTEMS"]["verdict"] == "cancel")
+    check("renewals_duplicate_refuses_to_predict",
+          subs["ADOBE SYSTEMS"]["next_charge"] is None)
+    check("renewals_dormant_flagged",
+          "DORMANT" in subs["IRON YARD GYM"]["flags"])
+    check("renewals_yearly_not_mistaken_for_dormant",
+          "DORMANT" not in subs["APPLE ICLOUD"]["flags"],
+          str(subs["APPLE ICLOUD"]["flags"]))
+    check("renewals_yearly_cadence", subs["APPLE ICLOUD"]["cadence"] == "yearly")
+    check("renewals_weekly_not_mistaken_for_duplicate",
+          "DUPLICATE" not in subs["BLUE BOTTLE COFFEE"]["flags"])
+    check("renewals_weekly_cadence",
+          subs["BLUE BOTTLE COFFEE"]["cadence"] == "weekly")
+    check("renewals_one_off_spend_not_a_subscription",
+          not any("AMAZON" in m or "UBER" in m for m in subs))
+    check("renewals_monthly_cadence", subs["SPOTIFY USA"]["cadence"] == "monthly")
+
+    check("renewals_next_charge_never_in_the_past",
+          all(s["next_charge"] is None or s["next_charge"] >= TODAY.isoformat()
+              for s in a["subscriptions"]))
+    cal = a["calendar"]
+    check("renewals_calendar_within_window",
+          all(TODAY.isoformat() <= e["date"] <= (TODAY + _td(days=60)).isoformat()
+              for e in cal))
+    check("renewals_calendar_sorted",
+          [e["date"] for e in cal] == sorted(e["date"] for e in cal))
+    check("renewals_calendar_excludes_unpredictable",
+          not any(e["merchant"] == "ADOBE SYSTEMS" for e in cal))
+
+    plan = a["plan"]
+    check("renewals_plan_conservative", plan["recoverable"] <= plan["annual_leak"])
+    check("renewals_plan_items_only_for_actionable",
+          all(i["verdict"] != "keep" for i in plan["items"]))
+    check("renewals_plan_positive", plan["recoverable"] > 0)
+    check("renewals_every_sub_has_nudge",
+          all(s["nudge"] for s in a["subscriptions"]))
+    check("renewals_nudge_addresses_merchant",
+          all(s["merchant"].split()[0].lower() in s["nudge"].lower()
+              for s in a["subscriptions"]))
+    check("renewals_nudge_states_the_amount",
+          any("%.2f" % s["amount"] in s["nudge"] for s in a["subscriptions"]))
+
+    check("renewals_empty_input_safe", analyze([], today=TODAY)["subscriptions"] == [])
+    check("renewals_single_charge_is_not_a_subscription",
+          detect_subscriptions(
+              parse_transactions_csv("2026-01-01,ACME,9.99\n"), today=TODAY) == [])
+    check("renewals_ignores_refunded_rows",
+          detect_subscriptions(parse_transactions_csv(
+              "2026-01-01,ACME,9.99\n2026-02-01,ACME,9.99\n"), today=TODAY)
+          != [])
+
+    # date format tolerance
+    for d in ("2026-03-05", "2026/3/5", "3/5/2026",
+              '"Mar 5, 2026"', "2026-03-05T10:11:12Z"):
+        got = parse_transactions_csv("%s,ACME,9.99\n%s,ACME,9.99\n" % (d, d))
+        check("renewals_parses_date_%s" % d.replace("/", "_").replace(" ", "_")
+              .replace(",", "").replace(":", ""),
+              len(got) == 2 and got[0].day == _date(2026, 3, 5), str(got[:1]))
+    check("renewals_parses_paypal_shape",
+          len(parse_paypal_transactions({"transactions": [
+              {"transaction_info": {
+                  "transaction_id": "A1",
+                  "transaction_initiation_date": "2026-01-05T00:00:00Z",
+                  "transaction_amount": {"value": "15.49",
+                                         "currency_code": "USD"}},
+               "merchant": {"name": "ACME"}},
+              {"transaction_info": {
+                  "transaction_id": "A2",
+                  "transaction_initiation_date": "2026-02-05T00:00:00Z",
+                  "transaction_amount": {"value": "15.49",
+                                         "currency_code": "USD"}},
+               "merchant": {"name": "ACME"}}]})) == 2)
+    check("renewals_paypal_shape_detected",
+          len(detect_subscriptions(parse_paypal_transactions([
+              {"transaction_info": {
+                  "transaction_initiation_date": "2026-01-05",
+                  "transaction_amount": {"value": "15.49"}},
+               "merchant": {"name": "ACME"}},
+              {"transaction_info": {
+                  "transaction_initiation_date": "2026-02-04",
+                  "transaction_amount": {"value": "15.49"}},
+               "merchant": {"name": "ACME"}}]), today=TODAY)) == 1)
+    check("renewals_skips_garbage_rows",
+          parse_transactions_csv("date,merchant,amount\nnotadate,ACME,9.99\n"
+                                 "2026-01-01,,9.99\n2026-01-01,ACME,abc\n") == [])
+
+    page = render_renewals_page(txns, today=TODAY)
+    check("renewals_page_has_calendar", "<table class='cal'>" in page)
+    check("renewals_page_has_table", "NETFLIX.COM" in page)
+    check("renewals_page_has_plan", "Est. saving" in page)
+    check("renewals_page_no_unreplaced_tokens",
+          "__KPIS__" not in page and "__CAL__" not in page)
+    check("renewals_page_escapes_nudge",
+          "<script" not in page.replace("<style", "").replace("</style", ""))
+
+    # hostile merchant name must not inject markup
+    bad = parse_transactions_csv(
+        "2026-01-01,<img src=x onerror=alert(1)>,9.99\n"
+        "2026-02-01,<img src=x onerror=alert(1)>,9.99\n")
+    bad_page = render_renewals_page(bad, today=TODAY)
+    check("renewals_page_neutralises_html_injection",
+          "<img src=x" not in bad_page and "&lt;img" in bad_page)
+
+    # live HTTP
+    from http.server import ThreadingHTTPServer
+    from paypilot.web import make_handler
+    import threading
+    import urllib.request
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(CATALOG, False))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        base = "http://127.0.0.1:%d" % httpd.server_address[1]
+        with urllib.request.urlopen(base + "/renewals", timeout=20) as r:
+            rp = r.read().decode("utf-8")
+        check("renewals_http_page", r.status == 200 and "Renewal Radar" in rp)
+        with urllib.request.urlopen(base + "/api/v1/renewals", timeout=20) as r:
+            rd = json.loads(r.read().decode("utf-8"))
+        check("renewals_http_api_ok", rd["ok"])
+        check("renewals_http_api_has_subs", len(rd["data"]["subscriptions"]) >= 1,
+              str(rd["data"])[:80])
+        check("renewals_http_api_has_plan", "recoverable" in rd["data"]["plan"])
+    finally:
+        httpd.shutdown()
+
+    buf4 = io.StringIO()
+    with contextlib.redirect_stdout(buf4):
+        rc_ren = cli_main(["renewals"])
+    check("renewals_cli_runs", rc_ren == 0 and "Renewal Radar" in buf4.getvalue())
+    check("renewals_cli_reports_hike", "PRICE_HIKE" in buf4.getvalue())
+
     # CLI surface for the same context
     import contextlib
     import io
