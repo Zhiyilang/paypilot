@@ -6,14 +6,17 @@ Mode: mock by default (no keys needed). Set PAYPAL_CLIENT_ID/PAYPAL_SECRET and
 start with `serve --live` to point at the real sandbox.
 """
 import html
+import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from .agent import ShopAgent
 from .catalog import load_catalog
+from .grid import render_grid_page, rows_payload
 from .mock_paypal import MockPayPal
 from .paypal import PayPalClient
+from .policy import Policy
 from .reasoning import get_brain
 
 E = html.escape
@@ -51,7 +54,8 @@ code{background:#eef1f5;border-radius:4px;padding:1px 5px;font-size:13px}
 h2{font-size:16px;margin:0 0 8px}
 </style></head><body><div class="wrap">
 <header><h1>PayPilot</h1>
-<p>An AI shopping agent with policy guardrails. It reads your request, picks a product with evidence, checks spending policy <em>before</em> touching money, and pays with a real PayPal sandbox checkout.</p></header>
+<p>An AI shopping agent with policy guardrails. It reads your request, picks a product with evidence, checks spending policy <em>before</em> touching money, and pays with a real PayPal sandbox checkout.</p>
+<p><a href="/grid">Open the Policy Audit Grid &rarr;</a> <span class="mode">(every catalog item scored against the policy engine, in AG Grid)</span></p></header>
 <div class="card">
 <form method="post" action="/run">
 <label for="req">What should the agent buy?</label>
@@ -144,6 +148,7 @@ def make_handler(catalog_path, live):
         return ShopAgent(products, brain=brain, paypal=paypal)
 
     from .cli import SCENARIOS
+    products_cache = load_catalog(catalog_path)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -155,9 +160,27 @@ def make_handler(catalog_path, live):
             self.end_headers()
             self.wfile.write(body.encode("utf-8"))
 
+        def _spent(self):
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                return max(0.0, float((q.get("spent") or ["0"])[0]))
+            except (TypeError, ValueError):
+                return 0.0
+
         def do_GET(self):
-            if self.path.startswith("/healthz"):
+            path = urlparse(self.path).path
+            if path.startswith("/healthz"):
                 self._send('{"ok":true}', ctype="application/json")
+                return
+            if path.startswith("/api/rows"):
+                payload = rows_payload(products_cache, Policy(),
+                                       daily_spent=self._spent())
+                self._send(json.dumps(payload, ensure_ascii=False),
+                           ctype="application/json")
+                return
+            if path.startswith("/grid"):
+                self._send(render_grid_page(products_cache, Policy(),
+                                            daily_spent=self._spent()))
                 return
             page = _render_page("", "", "",
                                 mode="LIVE sandbox" if live else "mock (offline)")
