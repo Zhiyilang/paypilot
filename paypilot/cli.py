@@ -84,6 +84,25 @@ def cmd_serve(args):
     serve(port=args.port, catalog_path=args.catalog, live=args.live)
 
 
+def cmd_context(args):
+    """Print the API + policy context an external agent needs."""
+    from .catalog import load_catalog
+    from .context import context_json, context_text
+    products = load_catalog(args.catalog)
+    if args.format == "json":
+        print(context_json(products))
+    else:
+        print(context_text(products))
+    return 0
+
+
+def cmd_apidocs(args):
+    """Print the OpenAPI document."""
+    from .api import load_spec
+    print(load_spec())
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="paypilot",
                                  description="AI shopping agent with policy guardrails")
@@ -109,6 +128,15 @@ def main(argv=None):
     p_serve.add_argument("--port", type=int, default=8780)
     p_serve.add_argument("--live", action="store_true")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_ctx = sub.add_parser("context",
+                           help="print API + policy context for an LLM agent")
+    p_ctx.add_argument("--format", choices=["markdown", "json"],
+                       default="markdown")
+    p_ctx.set_defaults(func=cmd_context)
+
+    p_spec = sub.add_parser("apidocs", help="print the OpenAPI 3.0.3 spec")
+    p_spec.set_defaults(func=cmd_apidocs)
 
     args = ap.parse_args(argv)
     if not getattr(args, "func", None):
