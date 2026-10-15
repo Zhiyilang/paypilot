@@ -103,6 +103,31 @@ def cmd_apidocs(args):
     return 0
 
 
+def cmd_renewals(args):
+    """Renewal Radar: what renews next, what went up, what is double-charged."""
+    from .renewals import analyze, parse_transactions_csv
+    with open(args.file, encoding="utf-8-sig") as f:
+        txns = parse_transactions_csv(f.read())
+    a = analyze(txns)
+    p = a["plan"]
+    print("Renewal Radar - %d transactions, %d subscriptions"
+          % (a["transaction_count"], len(a["subscriptions"])))
+    print("  annual recurring $%.2f - recoverable ~$%.2f"
+          % (p["annual_leak"], p["recoverable"]))
+    print()
+    for s in a["subscriptions"]:
+        print("  %-22s %-9s $%-8.2f %-12s next=%-11s %s"
+              % (s["merchant"], s["cadence"], s["amount"], s["verdict"],
+                 s["next_charge"] or "-", ",".join(s["flags"]) or "-"))
+        for e in s["evidence"][:2]:
+            print("        - %s" % e)
+        print("        nudge: %s" % s["nudge"])
+    if args.json:
+        import json
+        print(json.dumps(a, indent=2))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="paypilot",
                                  description="AI shopping agent with policy guardrails")
@@ -137,6 +162,15 @@ def main(argv=None):
 
     p_spec = sub.add_parser("apidocs", help="print the OpenAPI 3.0.3 spec")
     p_spec.set_defaults(func=cmd_apidocs)
+
+    p_ren = sub.add_parser("renewals",
+                           help="find recurring charges, hikes and duplicates")
+    p_ren.add_argument("--file", default=os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "examples", "transactions.csv"),
+        help="transaction CSV (date,merchant,amount)")
+    p_ren.add_argument("--json", action="store_true")
+    p_ren.set_defaults(func=cmd_renewals)
 
     args = ap.parse_args(argv)
     if not getattr(args, "func", None):
