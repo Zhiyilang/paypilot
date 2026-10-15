@@ -98,6 +98,45 @@ The grid is *not* a decorative dashboard: it is how you verify that the
 guardrails hold across the entire catalog, not just in the one scenario the
 demo happens to run.
 
+## REST API & agent context (OpenAPI 3.0.3)
+
+The same loop is exposed as JSON, so other agents and dashboards can call the
+guardrails instead of re-implementing them. There is **one** implementation of
+"how PayPilot decides"; the CLI, the web UI, the grid and this API all route
+through it.
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/v1/health` | liveness + PayPal mode + brain |
+| `GET` | `/api/v1/catalog` | search/rank (`?category=&max_price=&q=&sort=`) |
+| `GET` | `/api/v1/context` | API + policy digest, sized for an LLM prompt |
+| `POST` | `/api/v1/quote` | intent + ranked candidates — **never pays** |
+| `POST` | `/api/v1/policy/check` | `{product_id, daily_spent}` → allow/block/hold + rule |
+| `POST` | `/api/v1/agent/run` | the full loop, optionally paying |
+
+```bash
+python -m paypilot serve                      # then:
+curl -s localhost:8780/api/v1/health | jq
+curl -s -X POST localhost:8780/api/v1/quote -H 'Content-Type: application/json' \
+     -d '{"request":"birthday gift for my mom, under $50, she gardens"}' | jq
+```
+
+- **Spec**: `openapi.yaml`, served live at **`/openapi.yaml`**, browsable at
+  **`/docs`** (Swagger UI, with an offline fallback page).
+- **Postman**: `postman_collection.json` — import it, set `base_url`, run.
+- **Agent context**: `GET /api/v1/context` returns a compact block (operations,
+  the five policy rules, catalog shape, copy-pasteable curl examples) that fits
+  in ~1.5k tokens, plus a Markdown rendering at
+  `python -m paypilot context`. That is the piece you paste into a system prompt
+  to let a *foreign* agent call PayPilot correctly on the first try.
+- **Bring your own spec**: set `PAYPILOT_EXTRA_SPEC=/path/to/spec.yaml` and any
+  other OpenAPI document (including an APIMatic-generated one for the PayPal
+  REST API) is summarised into the same context block, so one prompt can hand an
+  agent PayPilot *and* a third-party API.
+
+Every response uses one envelope: `{"ok":true,"data":...,"meta":...}` or
+`{"ok":false,"error":{"code":...,"message":...}}`.
+
 ## Demo scenarios
 
 `python -m paypilot demo` runs four scenarios that show the agent's full behavioural range:
@@ -170,11 +209,15 @@ paypilot/
 │   ├── receipts.py        # text + HTML receipts with decision trail
 │   ├── cli.py             # shop / demo / serve commands
 │   ├── web.py             # stdlib web demo UI
-│   └── grid.py            # AG Grid policy audit console (/grid, /api/rows)
+│   ├── grid.py            # AG Grid policy audit console (/grid, /api/rows)
+│   ├── api.py             # REST API + OpenAPI serving (/api/v1/*, /docs)
+│   └── context.py         # agent-consumable API context
 ├── examples/
 │   ├── catalog.csv        # 17 products across 5 categories
 │   └── requests.txt       # example natural-language requests
-├── eval.py                # 77 assertions, runs offline
+├── openapi.yaml           # OpenAPI 3.0.3 spec, served at /openapi.yaml
+├── postman_collection.json
+├── eval.py                # 118 assertions, runs offline
 ├── requirements.txt       # (empty - stdlib only)
 ├── .env.example
 ├── LICENSE                # MIT
