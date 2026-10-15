@@ -262,6 +262,199 @@ def main():
     finally:
         httpd.shutdown()
 
+    # ---- REST API + OpenAPI + agent context -----------------------------------
+    from paypilot.api import dispatch, load_spec, render_docs, to_json
+    from paypilot.context import (build_context, context_text,
+                                  render_context_markdown, summarize_spec,
+                                  _yaml_to_ops)
+
+    spec = load_spec()
+    check("spec_declares_openapi_303", spec.startswith("openapi: 3.0.3"))
+    ops = _yaml_to_ops(spec)
+    check("spec_parses_six_operations", len(ops) == 6, str(len(ops)))
+    check("spec_operations_have_summaries", all(o["summary"] for o in ops))
+    check("spec_covers_all_endpoints",
+          {o["path"] for o in ops} == {
+              "/api/v1/health", "/api/v1/context", "/api/v1/catalog",
+              "/api/v1/quote", "/api/v1/policy/check", "/api/v1/agent/run"},
+          str({o["path"] for o in ops}))
+
+    ctx = build_context(PRODUCTS)
+    check("context_lists_operations", len(ctx["operations"]) == 6)
+    check("context_states_rules", len(ctx["policy_rules"]) == 5)
+    check("context_names_all_rules",
+          {r["rule"] for r in ctx["policy_rules"]} == {
+              "BLOCKED_MERCHANT", "CATEGORY_NOT_ALLOWED", "MAX_PER_ORDER",
+              "DAILY_LIMIT", "APPROVAL_THRESHOLD"})
+    check("context_describes_catalog", ctx["catalog_shape"]["size"] == len(PRODUCTS))
+    check("context_has_contract", len(ctx["contract"]) >= 3)
+    check("context_has_examples", len(ctx["examples"]) >= 5)
+    md = context_text(PRODUCTS)
+    check("context_markdown_fits_budget", len(md) <= 6000, str(len(md)))
+    check("context_markdown_mentions_guardrail",
+          "policy" in md.lower() and "APPROVAL_THRESHOLD" in md)
+    check("context_is_stable", context_text(PRODUCTS) == md)
+    trimmed = context_text(PRODUCTS, budget=400)
+    check("context_respects_tiny_budget", len(trimmed) <= 700, str(len(trimmed)))
+
+    # external spec injection (the APIMatic seam): drop a foreign spec in via env
+    import tempfile
+    ext = ("openapi: 3.0.0\ninfo:\n  title: Acme Payments\n  version: 1.0.0\n"
+           "paths:\n  /v2/checkout/orders:\n    post:\n"
+           "      summary: Create an order\n      operationId: createOrder\n"
+           "  /v2/payments/captures:\n    get:\n"
+           "      summary: Show capture\n      operationId: showCapture\n")
+    tmpdir = tempfile.mkdtemp()
+    extpath = os.path.join(tmpdir, "acme.yaml")
+    with open(extpath, "w", encoding="utf-8") as f:
+        f.write(ext)
+    prev = os.environ.get("PAYPILOT_EXTRA_SPEC")
+    os.environ["PAYPILOT_EXTRA_SPEC"] = extpath
+    try:
+        merged = build_context(PRODUCTS)
+        check("context_absorbs_external_spec",
+              merged.get("external_api", {}).get("operation_count") == 2,
+              str(merged.get("external_api")))
+        check("context_external_title", merged["external_api"]["title"] == "Acme Payments")
+        check("context_external_in_markdown",
+              "Acme Payments" in render_context_markdown(merged))
+        check("summarize_spec_reads_paths",
+              summarize_spec(ext)["operation_count"] == 2)
+    finally:
+        if prev is None:
+            os.environ.pop("PAYPILOT_EXTRA_SPEC", None)
+        else:
+            os.environ["PAYPILOT_EXTRA_SPEC"] = prev
+    check("context_external_spec_cleared",
+          "external_api" not in build_context(PRODUCTS))
+
+    # live HTTP over the REST API
+    from http.server import ThreadingHTTPServer
+    from paypilot.web import make_handler
+    import threading
+    import urllib.request
+    import urllib.error
+
+    def make_agent_api(daily_spent=0.0):
+        from paypilot.agent import ShopAgent
+        from paypilot.mock_paypal import MockPayPal
+        from paypilot.reasoning import get_brain
+        a = ShopAgent(PRODUCTS, brain=get_brain(prefer_llm=False),
+                      paypal=PayPalClient(mock=MockPayPal()),
+                      daily_spent=daily_spent)
+        a.mode = "mock"
+        return a
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(CATALOG, False))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    def get(path):
+        with urllib.request.urlopen(base + path, timeout=15) as r:
+            return r.status, r.read().decode("utf-8")
+
+    def post(path, obj, raw=None):
+        data = (raw if raw is not None else json.dumps(obj)).encode("utf-8")
+        req = urllib.request.Request(
+            base + path, data=data, method="POST",
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, r.read().decode("utf-8")
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode("utf-8")
+
+    try:
+        base = "http://127.0.0.1:%d" % httpd.server_address[1]
+        st, body = get("/openapi.yaml")
+        check("api_http_spec_served", st == 200 and body.startswith("openapi: 3.0.3"))
+        st, body = get("/docs")
+        check("api_http_docs_served", st == 200 and "swagger" in body.lower())
+        check("api_http_docs_has_fallback", "fallback" in body)
+        st, body = get("/api/v1/health")
+        health = json.loads(body)
+        check("api_http_health_ok",
+              st == 200 and health["ok"] and health["data"]["status"] == "ok")
+        check("api_http_health_reports_catalog",
+              health["data"]["catalog_size"] == len(PRODUCTS))
+
+        st, body = get("/api/v1/catalog?category=books&max_price=40")
+        cat = json.loads(body)
+        check("api_http_catalog_filters",
+              cat["ok"] and all(c["product"]["category"] == "books"
+                                and c["product"]["price"] <= 40
+                                for c in cat["data"]))
+        st, body = post("/api/v1/quote",
+                        {"request": "birthday gift for my mom, under $50, she gardens"})
+        q = json.loads(body)
+        check("api_http_quote_ok", st == 200 and q["ok"])
+        check("api_http_quote_has_intent", "budget" in q["data"]["intent"])
+        check("api_http_quote_has_candidates", len(q["data"]["candidates"]) > 0)
+        check("api_http_quote_moves_no_money",
+              "does not move money" in q["data"]["note"])
+
+        st, body = post("/api/v1/quote", {"request": "   "})
+        check("api_http_empty_request_rejected",
+              st == 400 and json.loads(body)["error"]["code"] == "EMPTY_REQUEST")
+
+        pid = PRODUCTS[0].id
+        st, body = post("/api/v1/policy/check", {"product_id": pid})
+        pc = json.loads(body)
+        check("api_http_policy_check_ok", st == 200 and pc["ok"])
+        check("api_http_policy_check_decision",
+              pc["data"]["decision"]["action"] in ("allow", "block", "hold"))
+        check("api_http_policy_check_cites_rule", bool(pc["data"]["decision"]["rule"]))
+        st, body = post("/api/v1/policy/check", {"product_id": "NOPE"})
+        check("api_http_policy_unknown_product",
+              st == 404 and json.loads(body)["error"]["code"] == "UNKNOWN_PRODUCT")
+        st, body = post("/api/v1/policy/check",
+                        {"product_id": pid, "daily_spent": 99999})
+        check("api_http_policy_daily_limit_via_api",
+              json.loads(body)["data"]["decision"]["action"] == "block")
+
+        st, body = post("/api/v1/agent/run",
+                        {"request": "cheapest gardening book"})
+        run = json.loads(body)
+        check("api_http_agent_run_ok", st == 200 and run["ok"])
+        check("api_http_agent_run_status",
+              run["data"]["status"] in ("completed", "blocked",
+                                        "awaiting_approval", "no_match"))
+        check("api_http_agent_run_has_trail",
+              [t["phase"] for t in run["data"]["trail"]][:1] == ["PERCEIVE"])
+
+        st, body = post("/api/v1/nope", {})
+        check("api_http_unknown_endpoint_404",
+              st == 404 and json.loads(body)["error"]["code"] == "NOT_FOUND")
+        st, body = post("/api/v1/quote", None, raw="{not json")
+        check("api_http_bad_json_400",
+              st == 400 and json.loads(body)["error"]["code"] == "INVALID_JSON")
+        st, body = get("/api/v1/context")
+        cctx = json.loads(body)
+        check("api_http_context_endpoint",
+              cctx["ok"] and len(cctx["data"]["operations"]) == 6)
+    finally:
+        httpd.shutdown()
+
+    # CLI surface for the same context
+    import contextlib
+    import io
+    from paypilot.cli import main as cli_main
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc_ctx = cli_main(["context", "--format", "json"])
+    check("cli_context_json_exits_zero", rc_ctx == 0)
+    check("cli_context_json_valid",
+          json.loads(buf.getvalue())["service"] == "PayPilot")
+    buf2 = io.StringIO()
+    with contextlib.redirect_stdout(buf2):
+        rc_doc = cli_main(["apidocs"])
+    check("cli_apidocs_prints_spec",
+          rc_doc == 0 and buf2.getvalue().startswith("openapi: 3.0.3"))
+    buf3 = io.StringIO()
+    with contextlib.redirect_stdout(buf3):
+        cli_main(["context"])
+    check("cli_context_markdown_default", buf3.getvalue().startswith("# PayPilot API context"))
+
     # ---- LLM brain fallback --------------------------------------------------
     try:
         LLMBrain("http://127.0.0.1:1/unreachable", "k", "m").parse("buy a book")
