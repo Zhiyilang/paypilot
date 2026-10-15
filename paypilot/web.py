@@ -18,6 +18,7 @@ from .mock_paypal import MockPayPal
 from .paypal import PayPalClient
 from .policy import Policy
 from .reasoning import get_brain
+from .renewals import (analyze, parse_transactions_csv, render_renewals_page)
 
 E = html.escape
 
@@ -56,7 +57,8 @@ h2{font-size:16px;margin:0 0 8px}
 <header><h1>PayPilot</h1>
 <p>An AI shopping agent with policy guardrails. It reads your request, picks a product with evidence, checks spending policy <em>before</em> touching money, and pays with a real PayPal sandbox checkout.</p>
 <p><a href="/grid">Open the Policy Audit Grid &rarr;</a> <span class="mode">(every catalog item scored against the policy engine, in AG Grid)</span>
-&middot; <a href="/docs">API docs</a> <span class="mode">(OpenAPI 3.0.3 + Swagger UI)</span></p></header>
+&middot; <a href="/docs">API docs</a> <span class="mode">(OpenAPI 3.0.3 + Swagger UI)</span>
+&middot; <a href="/renewals">Renewal Radar</a> <span class="mode">(subscriptions, price hikes, duplicates, polite nudges)</span></p></header>
 <div class="card">
 <form method="post" action="/run">
 <label for="req">What should the agent buy?</label>
@@ -151,6 +153,14 @@ def make_handler(catalog_path, live):
     from .cli import SCENARIOS
     products_cache = load_catalog(catalog_path)
 
+    txn_path = os.environ.get("PAYPILOT_TRANSACTIONS") or os.path.join(
+        os.path.dirname(__file__), "..", "examples", "transactions.csv")
+    try:
+        with open(txn_path, encoding="utf-8-sig") as f:
+            txns_cache = parse_transactions_csv(f.read())
+    except OSError:
+        txns_cache = []
+
     def make_agent(daily_spent=0.0):
         brain = get_brain(prefer_llm=True)
         if live:
@@ -207,8 +217,15 @@ def make_handler(catalog_path, live):
                 from .api import render_docs
                 self._send(render_docs())
                 return
+            if path.startswith("/renewals"):
+                self._send(render_renewals_page(txns_cache))
+                return
             if path.startswith("/api/"):
-                from .api import dispatch, to_json
+                from .api import dispatch, ok, to_json
+                if path.startswith("/api/v1/renewals"):
+                    self._send(to_json(ok(analyze(txns_cache))[1]), 200,
+                               "application/json")
+                    return
                 status, body = dispatch(products_cache, make_agent, live,
                                         path, "GET", self._query(), None)
                 self._send(to_json(body), status, "application/json")
