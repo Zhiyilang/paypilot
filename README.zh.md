@@ -20,7 +20,7 @@ cd paypilot
 
 # 1. 跑测试套件（离线，无需任何密钥）
 python eval.py
-# -> 53 passed, 0 failed
+# -> 171 passed, 0 failed
 
 # 2. 跑 4 个演示场景（mock PayPal，离线）
 python -m paypilot demo
