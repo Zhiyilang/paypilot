@@ -67,6 +67,37 @@ request ──► PERCEIVE ──► SEARCH ──► SELECT ──► POLICY �
 
 **9. Receipt** — a plain-text receipt for the CLI and an HTML report with the full decision trail.
 
+## Policy Audit Grid (AG Grid)
+
+A single scenario proves one decision. The **Policy Audit Grid** proves the whole
+policy surface: every catalog item is run through the same `policy.check()`
+engine that gates real money, and rendered in [AG Grid Community](https://www.ag-grid.com/)
+so a reviewer can sort, filter and audit hundreds of decisions at once.
+
+Open it with `python -m paypilot serve` at **`/grid`** (or `/api/rows?spent=120`
+for the raw JSON).
+
+- **One row per product, one decision per row** — `allow` / `block` / `hold`,
+  plus the exact rule id (`MAX_PER_ORDER`, `DAILY_LIMIT`, `CATEGORY_NOT_ALLOWED`,
+  `APPROVAL_THRESHOLD`) and field-level evidence.
+- **Click any row** → the rule and its evidence render below the grid.
+- **Drag "already spent today"** → the `DAILY_LIMIT` rule flips rows to `block`
+  live, which is the fastest way to see the guardrail actually bite.
+- **Filter panel + CSV export** — AG Grid Community tool panel and
+  `exportDataAsCsv()`; blocked-only toggle for triage.
+- **Header KPIs** — rows audited, allowed / blocked / need-approval, total
+  buying power, total value blocked by policy.
+- **No build step, no CDN lock-in** — AG Grid comes from a CDN; if it is
+  unreachable the page falls back to a plain HTML table with the same data, so
+  the console still works in an air-gapped review environment.
+- **Injection-safe embedding** — row data is JSON-escaped (`</` → `<\/`) so a
+  hostile product name cannot break out of the `<script>` block (covered by
+  `eval.py`).
+
+The grid is *not* a decorative dashboard: it is how you verify that the
+guardrails hold across the entire catalog, not just in the one scenario the
+demo happens to run.
+
 ## Demo scenarios
 
 `python -m paypilot demo` runs four scenarios that show the agent's full behavioural range:
@@ -138,11 +169,12 @@ paypilot/
 │   ├── agent.py           # the agent loop
 │   ├── receipts.py        # text + HTML receipts with decision trail
 │   ├── cli.py             # shop / demo / serve commands
-│   └── web.py             # stdlib web demo UI
+│   ├── web.py             # stdlib web demo UI
+│   └── grid.py            # AG Grid policy audit console (/grid, /api/rows)
 ├── examples/
 │   ├── catalog.csv        # 17 products across 5 categories
 │   └── requests.txt       # example natural-language requests
-├── eval.py                # 53 assertions, runs offline
+├── eval.py                # 77 assertions, runs offline
 ├── requirements.txt       # (empty - stdlib only)
 ├── .env.example
 ├── LICENSE                # MIT
