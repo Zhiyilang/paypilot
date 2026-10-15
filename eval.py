@@ -5,6 +5,7 @@ OAuth -> order -> capture flow, receipts, and brain fallback behaviour.
 
 Usage:  python eval.py        (exit code 0 = all pass)
 """
+import json
 import os
 import sys
 
@@ -176,6 +177,90 @@ def main():
     check("mock_capture_completed", cstatus == "COMPLETED", str(cstatus))
     check("mock_capture_id", bool(cid and cid.startswith("MOCK-CAPTURE-")))
     check("mock_get_order", client.get_order(order["id"])["id"] == order["id"])
+
+    # ---- AG Grid policy audit console ----------------------------------------
+    from paypilot.catalog import Product
+    from paypilot.grid import (audit_rows, render_grid_page, rows_payload,
+                               summarize)
+
+    pol = Policy()
+    rows = audit_rows(PRODUCTS, pol)
+    check("grid_audits_every_row", len(rows) == len(PRODUCTS),
+          "%d vs %d" % (len(rows), len(PRODUCTS)))
+    check("grid_decisions_are_valid",
+          all(r["decision"] in ("allow", "block", "hold") for r in rows))
+    check("grid_every_row_cites_a_rule", all(r["rule"] for r in rows))
+    check("grid_every_row_has_evidence", all(r["evidence"] for r in rows))
+    s = summarize(rows)
+    check("grid_summary_counts_match",
+          s["allow"] + s["block"] + s["hold"] == s["total"], str(s))
+    check("grid_over_cap_is_blocked",
+          all(r["decision"] == "block" for r in rows if r["price"] > pol.max_per_order))
+    check("grid_approval_threshold_holds",
+          all(r["decision"] == "hold" for r in rows
+              if pol.approval_threshold <= r["price"] <= pol.max_per_order
+              and r["category"] in pol.allowed_categories))
+    check("grid_disallowed_category_blocked",
+          all(r["rule"] == "CATEGORY_NOT_ALLOWED" for r in rows
+              if r["category"] not in pol.allowed_categories))
+
+    # daily spend is the interesting dial: raising it flips rows to DAILY_LIMIT
+    base_blocked = summarize(rows)["block"]
+    loaded = audit_rows(PRODUCTS, pol, daily_spent=480.0)
+    check("grid_daily_limit_flips_rows",
+          summarize(loaded)["block"] > base_blocked,
+          "%d -> %d" % (base_blocked, summarize(loaded)["block"]))
+    check("grid_daily_limit_rule_named",
+          any(r["rule"] == "DAILY_LIMIT" for r in loaded))
+    check("grid_deterministic",
+          audit_rows(PRODUCTS, pol) == audit_rows(PRODUCTS, pol))
+
+    # payload + page
+    payload = rows_payload(PRODUCTS, pol, daily_spent=50.0)
+    check("grid_payload_roundtrip",
+          json.loads(json.dumps(payload))["summary"]["total"] == len(PRODUCTS))
+    page = render_grid_page(PRODUCTS, pol)
+    check("grid_page_loads_aggrid", "ag-grid-community" in page)
+    check("grid_page_has_grid_mount", 'id="grid"' in page)
+    check("grid_page_declares_columns", "columnDefs" in page)
+    check("grid_page_emits_rows", "const ROWS =" in page)
+    check("grid_page_has_fallback", "drawFallback" in page)
+    check("grid_page_no_unreplaced_tokens", "__" not in page.split("<script>")[0])
+
+    # hostile product name must not escape the <script> block
+    nasty = [Product(id="X1", name="</script><script>alert(1)</script>",
+                     category="books", price=9.0, rating=4.0, tags=[],
+                     merchant="M", stock=1)]
+    nasty_page = render_grid_page(nasty, pol)
+    check("grid_escapes_script_breakout",
+            nasty_page.count("</script>") == nasty_page.count("<script>"),
+            "script tags unbalanced")
+    check("grid_neutralises_breakout_payload",
+          "<script>alert(1)</script>" not in nasty_page)
+
+    # live HTTP: /grid renders and /api/rows returns JSON
+    from http.server import ThreadingHTTPServer
+    from paypilot.web import make_handler
+    import threading
+    import urllib.request
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(CATALOG, False))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        base = "http://127.0.0.1:%d" % httpd.server_address[1]
+        with urllib.request.urlopen(base + "/grid", timeout=10) as r:
+            body = r.read().decode("utf-8")
+        check("http_grid_serves_page", "<title>PayPilot" in body and "ROWS =" in body)
+        with urllib.request.urlopen(base + "/api/rows?spent=300", timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        check("http_api_rows_json", data["summary"]["total"] == len(PRODUCTS))
+        check("http_api_rows_honours_spent",
+              data["daily_spent"] == 300.0 and data["summary"]["block"] > 0)
+        with urllib.request.urlopen(base + "/grid?spent=9999", timeout=10) as r:
+            big = r.read().decode("utf-8")
+        check("http_grid_extreme_spent_still_renders", "ROWS =" in big)
+    finally:
+        httpd.shutdown()
 
     # ---- LLM brain fallback --------------------------------------------------
     try:
