@@ -7,7 +7,10 @@ Usage:  python eval.py        (exit code 0 = all pass)
 """
 import json
 import os
+import subprocess
 import sys
+import time
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,8 +21,8 @@ from paypilot.paypal import PayPalClient
 from paypilot.policy import Policy, check as policy_check
 from paypilot.reasoning import OfflineBrain, LLMBrain, BrainError, get_brain
 
-CATALOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "examples", "catalog.csv")
+HERE = os.path.dirname(os.path.abspath(__file__))
+CATALOG = os.path.join(HERE, "examples", "catalog.csv")
 PRODUCTS = load_catalog(CATALOG)
 
 PASS = 0
@@ -628,6 +631,35 @@ def main():
         check("llm_unreachable_raises", True)
     b = get_brain(prefer_llm=False)
     check("get_brain_offline_default", isinstance(b, OfflineBrain))
+
+    # ---- deploy regression (2026-10-17): serve must honour $PORT ------------
+    # Same bug class fixed in tasteweaver: a hard-coded --port default silently
+    # ignored the PORT env var, so Render's assigned port was never bound and
+    # the hosted demo returned 502. Assert the CLI path binds $PORT.
+    _port = 18795
+    _env = dict(os.environ)
+    _env["PORT"] = str(_port)
+    _env.pop("PAYPILOT_PAYPAL_MODE", None)
+    _srv = subprocess.Popen([sys.executable, "-m", "paypilot", "serve"],
+                            cwd=HERE, env=_env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        _ok = False
+        for _ in range(20):
+            time.sleep(0.3)
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:%d/" % _port, timeout=2) as _r:
+                    _ok = _r.status == 200
+                    break
+            except Exception:
+                continue
+        check("cli_serve_port_env", _ok, "PORT=%d was not bound" % _port)
+    finally:
+        _srv.terminate()
+        try:
+            _srv.wait(timeout=5)
+        except Exception:
+            _srv.kill()
 
     print()
     print("=" * 60)

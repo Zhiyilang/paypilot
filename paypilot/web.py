@@ -274,7 +274,10 @@ def make_handler(catalog_path, live):
     return Handler
 
 
-def serve(port=8780, catalog_path=None, live=False):
+def serve(port=None, catalog_path=None, live=False):
+    # port=None -> honour the PORT env var (Render assigns a random one).
+    # A hard-coded default here would silently ignore $PORT -> host 502.
+    port = port or int(os.environ.get("PORT", "8780"))
     if catalog_path is None:
         catalog_path = os.path.join(os.path.dirname(__file__), "..",
                                     "examples", "catalog.csv")

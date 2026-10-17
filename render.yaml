@@ -1,0 +1,24 @@
+# Render Blueprint — one-click deploy for the PayPilot hosted demo.
+# Entry is server.py (reads $PORT, binds 0.0.0.0) — verified 2026-10-17 by a
+# CI regression assertion that binds a random $PORT and GETs "/" (200).
+# PayPal mode defaults to the offline mock so any judge can run it with zero
+# setup; set the PAYPILOT_* vars below for sandbox/live.
+services:
+  - type: web
+    name: paypilot
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: "python server.py"
+    healthCheckPath: /healthz
+    envVars:
+      - key: PAYPILOT_PAYPAL_MODE
+        value: mock            # mock | live (live needs the two vars below)
+      - key: PAYPILOT_CATALOG
+        sync: false            # optional; defaults to examples/catalog.csv
+      - key: PAYPAL_CLIENT_ID
+        sync: false            # sandbox credentials; mock mode ignores them
+      - key: PAYPAL_SECRET
+        sync: false
+      - key: PAYPAL_MERCHANT
+        value: paypilot

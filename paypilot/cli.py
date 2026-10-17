@@ -150,7 +150,10 @@ def main(argv=None):
     p_demo.set_defaults(func=cmd_demo)
 
     p_serve = sub.add_parser("serve", help="start the web demo UI")
-    p_serve.add_argument("--port", type=int, default=8780)
+    # default MUST be None: web.serve() falls back to the PORT env var, which
+    # is how Render/Heroku-style hosts tell us the port to bind. A hard-coded
+    # default here would silently ignore $PORT and the host would 502.
+    p_serve.add_argument("--port", type=int, default=None)
     p_serve.add_argument("--live", action="store_true")
     p_serve.set_defaults(func=cmd_serve)
 
