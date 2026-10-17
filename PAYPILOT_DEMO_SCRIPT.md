@@ -112,9 +112,9 @@ python -m paypilot context
 python eval.py
 ```
 
-Let the final line land on screen: **`171 passed, 0 failed`**.
+Let the final line land on screen: **`172 passed, 0 failed`**.
 
-> "171 assertions, fully offline — including a rogue-brain test where the model
+> "172 assertions, fully offline — including a rogue-brain test where the model
 > proposes a tool that doesn't exist and a destructive fix: both get rejected
 > and not one byte of data changes."
 
@@ -154,7 +154,7 @@ What's in the demo:
 1:15  Renewal Radar - renewal calendar, price hikes, duplicate charges,
       polite nudges
 1:45  REST API, OpenAPI 3.0.3, and a ~1.5k-token agent context block
-2:15  171 offline assertions, zero dependencies
+2:15  172 offline assertions, zero dependencies
 2:40  close
 
 Categories submitted to: Best Use of AG Studio, Best Use of APIMatic,
@@ -175,5 +175,5 @@ apimatic, postman, policy engine, python stdlib, guardrails`
       prefer **public**)
 - [ ] Under 3:00
 - [ ] No copyrighted music
-- [ ] `171 passed, 0 failed` is legible on screen
+- [ ] `172 passed, 0 failed` is legible on screen
 - [ ] GitHub link in the description

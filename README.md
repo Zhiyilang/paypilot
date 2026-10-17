@@ -10,7 +10,7 @@ PayPilot reads a natural-language shopping request, picks a product from a catal
 - **Two AI engines** — an OpenAI-compatible LLM brain (works with Xiaomi MiMo, OpenAI, etc.) *or* a deterministic offline brain. The agent degrades gracefully if the model is unavailable.
 - **Guardrails first** — per-order cap, daily cap, category allowlist, merchant blocklist, and a human-approval threshold. The LLM never sees the policy override path.
 - **Evidence-cited reasoning** — every candidate and every policy decision cites the fields it used.
-- **171 assertions** — `python eval.py` runs the whole agent loop against an in-process PayPal mock, offline.
+- **172 assertions** — `python eval.py` runs the whole agent loop against an in-process PayPal mock, offline.
 
 ## Quick start
 
@@ -20,7 +20,7 @@ cd paypilot
 
 # 1. run the test suite (offline, no keys needed)
 python eval.py
-# -> 171 passed, 0 failed
+# -> 172 passed, 0 failed
 
 # 2. run the 4 scripted demo scenarios (mock PayPal, offline)
 python -m paypilot demo
@@ -245,7 +245,7 @@ paypilot/
 ├── PAYPILOT_SUBMISSION.md   # Devpost submission text (copy-paste)
 ├── openapi.yaml           # OpenAPI 3.0.3 spec, served at /openapi.yaml
 ├── postman_collection.json
-├── eval.py                # 171 assertions, runs offline
+├── eval.py                # 172 assertions, runs offline
 ├── requirements.txt       # (empty - stdlib only)
 ├── .env.example
 ├── LICENSE                # MIT

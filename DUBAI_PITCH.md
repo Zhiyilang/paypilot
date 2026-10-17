@@ -34,7 +34,7 @@ PayPilot separates *reasoning* from *authorization*:
 Demo line for judges: *"Buy a $500 luxury watch."* → **Blocked: category not allowed. No payment attempted.**
 
 ### Slide 4 — Proof it works (the "measure" requirement)
-- **171 automated assertions** (`python eval.py`, offline, no keys): intent parsing, ranking, every guardrail (block/hold/allow), the mocked PayPal OAuth→order→capture loop, receipt generation, and LLM-failure fallback.
+- **172 automated assertions** (`python eval.py`, offline, no keys): intent parsing, ranking, every guardrail (block/hold/allow), the mocked PayPal OAuth→order→capture loop, receipt generation, and LLM-failure fallback.
 - **CI green across Python 3.8 / 3.10 / 3.12** (GitHub Actions).
 - **4 scripted demo scenarios** covering the full behavioral range: allowed+paid, cheapest-sort+paid, blocked, held→human-approved→paid.
 - Zero dependencies: any judge can clone and run the entire agent in 30 seconds, offline.
@@ -52,7 +52,7 @@ PayPilot is the reference implementation, and the open-source core of a control 
 - Grant use: build the control plane, run 3 paid pilots with SMB procurement teams, publish the safety benchmark.
 
 ### Slide 7 — The ask
-**USD 150,000 development grant** (Best Business AI Agent) to turn the reference implementation into the enterprise control plane — with 171 passing evals and a live PayPal integration as the starting proof.
+**USD 150,000 development grant** (Best Business AI Agent) to turn the reference implementation into the enterprise control plane — with 172 passing evals and a live PayPal integration as the starting proof.
 
 ---
 

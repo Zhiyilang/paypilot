@@ -118,7 +118,7 @@ than one buried in dependencies.
 
 ### Accomplishments we're proud of
 
-171 offline assertions, including a rogue-brain test where the model proposes a
+172 offline assertions, including a rogue-brain test where the model proposes a
 tool that does not exist and then a destructive fix — both are rejected and not
 one byte of data changes. Zero dependencies. Runs with no credentials at all.
 
@@ -152,8 +152,8 @@ Render, OpenAI-compatible LLM API
 
 | Criterion | What to point them at |
 |---|---|
-| Technological implementation | one decision engine across CLI / web / grid / REST API; 171 assertions; zero dependencies |
+| Technological implementation | one decision engine across CLI / web / grid / REST API; 172 assertions; zero dependencies |
 | Design | the decision trail — every phase cites its evidence; blocked/held are first-class outcomes, not errors |
 | Potential impact | Renewal Radar turns the same payment data into money the user gets back |
 | Innovation | guardrails the model cannot reach; API context sized for an LLM prompt |
-| Presentation | the video's live DAILY_LIMIT flip and the 171/171 run |
+| Presentation | the video's live DAILY_LIMIT flip and the 172/172 run |

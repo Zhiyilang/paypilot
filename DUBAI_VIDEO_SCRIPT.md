@@ -3,7 +3,7 @@
 > 用途：PayPal AI Hackathon（要求 ≤3 分钟 YouTube 公开视频）+ 迪拜 Create AI Agents Championship（演示视频三件套之一）。
 > 工具：任选录屏软件（Win+G Xbox Game Bar / OBS / 浏览器插件），麦克风可有可无（建议加，不加也能过）。
 > 总时长控制：2:30–3:00。语速正常即可，不要赶。
-> 命令已实测可跑（2026-10-16）：`python -m paypilot demo` 四场景全过、`python -m paypilot serve --port 8780` HTTP 200、`python eval.py` → **171 passed, 0 failed**。
+> 命令已实测可跑（2026-10-16）：`python -m paypilot demo` 四场景全过、`python -m paypilot serve --port 8780` HTTP 200、`python eval.py` → **172 passed, 0 failed**。
 
 ---
 
@@ -12,7 +12,7 @@
 1. 打开项目目录：`D:\桌面\part-time jobs\GitHub\paypilot`
 2. 终端字号调到 16–18（录出来评委看得清）
 3. 关掉无关窗口和通知
-4. 先空跑一遍 `python -m paypilot demo` 确认能跑（再跑 `python eval.py` 确认 171 passed 再录）
+4. 先空跑一遍 `python -m paypilot demo` 确认能跑（再跑 `python eval.py` 确认 172 passed 再录）
 5. 开始录屏
 
 ## 脚本（照着念/打字即可）
@@ -54,7 +54,7 @@ python -m paypilot serve --port 8780
 ```
 python eval.py
 ```
-（让 171 passed 滚出来）
+（让 172 passed 滚出来）
 > "The project ships with one hundred seventy-one automated assertions covering every guardrail and the full payment loop, and CI runs green across three Python versions. Anyone can clone the repo and run the entire agent in thirty seconds — no keys, no setup."
 
 ### 【2:15–2:45】收尾
@@ -70,7 +70,7 @@ python eval.py
 - [ ] Scenario 3 出现 BLOCKED / CATEGORY_NOT_ALLOWED
 - [ ] Scenario 4 出现 HOLD → human approved → COMPLETED
 - [ ] Web 界面表单提交后出现完整 decision trail
-- [ ] eval.py 出现 "171 passed, 0 failed"
+- [ ] eval.py 出现 "172 passed, 0 failed"
 - [ ] 总时长 ≤ 3:00（超了就删减解说，别删演示）
 - [ ] 上传 YouTube（公开），链接贴到 Devpost 提交表单 + 迪拜平台
 
