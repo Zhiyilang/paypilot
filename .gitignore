@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+_frames_*/
+_chk_*
+_probe*/
+paypilot_demo.mp4
+_DUBAI_*
+
