@@ -3,7 +3,10 @@
 **Hackathon:** Build What's Next with PayPal and AI
 **Devpost:** https://paypalaihackathon.devpost.com/ （2026-10-22 实测在线，17,781 participants）
 **Deadline:** Nov 12, 2026 15:00 GMT-5 = **北京 11-13 04:00**（Devpost 页逐字，与 reconscribe 口径一致）
-**Repo:** https://gitee.com/ZhiYIlang/paypilot （当前版：web.py 10-22 有更新；公开 / MIT ✓，符合"public + license visible"硬规则；GitHub 镜像 https://github.com/Zhiyilang/paypilot 为 10-18 旧版）
+**Repo (REQUIRED — GitHub):** https://github.com/Zhiyilang/paypilot （当前版，172/172 已验证；公开 / MIT ✓，符合"public + license visible"硬规则）
+**Backup (Gitee, NOT counted by PayPal):** https://gitee.com/ZhiYIlang/paypilot
+> ⚠️ PayPal 官方规则要求 repo 必须在 GitHub/GitLab/Bitbucket，**Gitee 链接评委不接受**。
+> GitHub 旧版（10-18）须用当前版覆盖：见 `PUSH_GITHUB.md`（本地 git 仓已就绪，约 5 分钟推送）。
 **Prize structure (official页逐字):** 1st $12,000 / 2nd $8,000 / 3rd $5,000 / Most Creative $5k / Most Impactful $5k / Best Demo Delivery $5k / Best Use of PayPal+AI $5k / Best Use of Agentic Commerce $5k / Best Use of AG Grid 1st $5k、2nd $2k、3rd $1k×3 / Best Use of APIMatic $1k×3 / Best Use of Render（credits）
 **Demo URL:** Render 已被挂起——登录 Render 恢复部署（render.yaml 一键）；兜底=提交里注明 "runs locally: python -m paypilot serve"（零依赖 stdlib，clone 即可跑，符合官方"judges must be able to actually run"要求，但 hosted URL 更稳）
 
@@ -141,7 +144,8 @@ Render, OpenAI-compatible LLM API
 - [ ] Best Use of Channel3 — needs an API key we don't have
 
 **Links**
-- Repo: https://gitee.com/ZhiYIlang/paypilot（当前版；GitHub 镜像 https://github.com/Zhiyilang/paypilot 为 10-18 旧版）
+- Repo (GitHub, required): https://github.com/Zhiyilang/paypilot ← 当前版（推送见 `PUSH_GITHUB.md`）
+- Backup (Gitee, not counted): https://gitee.com/ZhiYIlang/paypilot
 - Video: `<your YouTube URL>`
 - Demo: `<your Render URL>` (or note "runs locally: `python -m paypilot serve`")
 

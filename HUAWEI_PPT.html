@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PayPilot · 华为智能体创新赛</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #eef1f6; }
+  .page {
+    width: 297mm; height: 210mm; padding: 16mm 18mm;
+    background: #ffffff; position: relative; page-break-after: always;
+    display: flex; flex-direction: column;
+  }
+  .page:last-child { page-break-after: auto; }
+  .hdr { border-left: 6px solid #c7000b; padding-left: 14px; margin-bottom: 10mm; }
+  .hdr h1 { font-size: 30px; color: #16181d; letter-spacing: .5px; }
+  .hdr .sub { font-size: 14px; color: #5a6270; margin-top: 5px; }
+  .body { flex: 1; display: flex; gap: 10mm; }
+  .col { flex: 1; }
+  h2 { font-size: 17px; color: #c7000b; margin-bottom: 6px;
+       border-bottom: 1px solid #dde2ea; padding-bottom: 5px; }
+  p, li { font-size: 13px; line-height: 1.75; color: #2b303b; }
+  ul { padding-left: 17px; }
+  li { margin-bottom: 5px; }
+  .kpis { display: flex; gap: 6mm; margin: 5mm 0 7mm; }
+  .kpi { flex: 1; background: #f6f8fb; border: 1px solid #dde2ea;
+         border-radius: 8px; padding: 5mm 4mm; text-align: center; }
+  .kpi .n { font-size: 30px; font-weight: 700; color: #c7000b; line-height: 1.1; }
+  .kpi .l { font-size: 11px; color: #5a6270; margin-top: 5px; }
+  .flow { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; margin: 4mm 0; }
+  .step { background: #f6f8fb; border: 1px solid #dde2ea; border-radius: 6px;
+          padding: 4px 8px; font-size: 11px; font-family: Consolas, monospace; color: #2b303b; }
+  .step.hi { background: #fdecee; border-color: #c7000b; color: #c7000b; font-weight: 700; }
+  .arrow { color: #9aa3b2; font-size: 12px; }
+  .term { background: #16181d; color: #d8dee9; border-radius: 8px; padding: 5mm 6mm;
+          font-family: Consolas, "Courier New", monospace; font-size: 11.5px; line-height: 1.65; }
+  .term .g { color: #7fd67f; } .term .r { color: #ff8f8f; } .term .y { color: #ffd479; }
+  .term .c { color: #6fb3d2; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid #dde2ea; padding: 5px 8px; text-align: left; }
+  th { background: #f6f8fb; color: #16181d; font-weight: 600; }
+  td.num { font-family: Consolas, monospace; color: #c7000b; font-weight: 600; }
+  .foot { position: absolute; bottom: 9mm; left: 18mm; right: 18mm;
+          border-top: 1px solid #dde2ea; padding-top: 4px;
+          font-size: 10.5px; color: #8b93a1; display: flex; justify-content: space-between; }
+  .note { background: #fff8e6; border: 1px solid #f0d999; border-radius: 6px;
+          padding: 4mm 5mm; font-size: 12px; color: #6b5510; margin-top: 4mm; }
+</style>
+</head>
+<body>
+
+<!-- Page 1: 场景背景 -->
+<section class="page">
+  <div class="hdr">
+    <h1>PayPilot · 带策略护栏的 AI 购物支付智能体</h1>
+    <div class="sub">2026 华为开发者大赛 · 智能体创新赛（中部赛区）｜参赛主体：OPC（一人公司／超级个体）｜场景方向：企业场景 · 办公协同与流程创新</div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="n">172</div><div class="l">断言全部通过（0 失败）</div></div>
+    <div class="kpi"><div class="n">0</div><div class="l">第三方依赖</div></div>
+    <div class="kpi"><div class="n">5</div><div class="l">道策略护栏闸口</div></div>
+    <div class="kpi"><div class="n">7</div><div class="l">步可审计决策链</div></div>
+  </div>
+  <div class="body">
+    <div class="col">
+      <h2>一、场景背景</h2>
+      <p>智能体正从「能对话」走向「能做事」。一旦 AI 被授予真实支付能力，企业面临的不再是模型能力问题，而是<b>资金安全与责任归因</b>问题。</p>
+      <h2 style="margin-top:7mm">二、真实痛点（三条）</h2>
+      <ul>
+        <li><b>缺乏事前管控</b>：多数智能体的金额管控在付款之后才生效，钱已出手。</li>
+        <li><b>提示词护栏可被绕过</b>：把「不许乱花钱」写进 prompt，模型可被说服放行——护栏缺少架构级保证。</li>
+        <li><b>决策无法归因</b>：智能体为什么买这件、为什么放行，事后查不到证据链。</li>
+      </ul>
+      <div class="note"><b>目标用户：</b>需要给 AI 智能体授予受限支付/采购权限的企业与超级个体（OPC）。</div>
+    </div>
+    <div class="col">
+      <h2>三、PayPilot 的应对</h2>
+      <ul>
+        <li>在<b>触碰资金之前</b>执行策略引擎（pre-flight），不过闸则不调用支付 API。</li>
+        <li>策略覆写路径<b>对大模型不可见</b>——不是「提示词里写一句」，而是模型根本拿不到绕过开关。</li>
+        <li>每一步决策产出<b>带字段引用的审计链</b>，可完整回放。</li>
+      </ul>
+      <h2 style="margin-top:7mm">四、实测（本机可复现）</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr><td>python eval.py</td><td class="num">172 passed / 0 failed</td></tr>
+        <tr><td>python -m paypilot demo</td><td class="num">4 场景端到端通过</td></tr>
+        <tr><td>演示视频</td><td class="num">21.53s / 1280×720</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>PayPilot · Zhiyilang</span><span>1 / 4</span></div>
+</section>
+
+<!-- Page 2: 功能架构 -->
+<section class="page">
+  <div class="hdr">
+    <h1>功能架构与决策链</h1>
+    <div class="sub">纯 Python 标准库实现 · OpenAI 兼容 LLM 或确定性离线引擎双通道 · 模型不可用时优雅降级</div>
+  </div>
+  <div class="body">
+    <div class="col">
+      <h2>决策链（7 步，全链路可审计）</h2>
+      <div class="flow">
+        <span class="step">PERCEIVE</span><span class="arrow">→</span>
+        <span class="step">SEARCH</span><span class="arrow">→</span>
+        <span class="step">SELECT</span><span class="arrow">→</span>
+        <span class="step hi">POLICY</span><span class="arrow">→</span>
+        <span class="step">EXPLAIN</span><span class="arrow">→</span>
+        <span class="step">EXECUTE</span><span class="arrow">→</span>
+        <span class="step">CAPTURE</span>
+      </div>
+      <p style="margin-top:3mm"><b>POLICY 是关键闸口</b>：位于 EXECUTE 之前，未通过则不进入支付调用。策略判定独立于模型输出，模型只能看到「通过/拒绝」的结果，看不到覆写参数。</p>
+      <h2 style="margin-top:6mm">策略引擎：五道闸</h2>
+      <ul>
+        <li>单笔金额上限</li>
+        <li>日累计金额上限</li>
+        <li>类目白名单</li>
+        <li>商户黑名单</li>
+        <li>大额人工审批阈值</li>
+      </ul>
+      <h2 style="margin-top:6mm">模块构成（2,609 行）</h2>
+      <p style="font-family:Consolas,monospace;font-size:11.5px;line-height:1.9">
+        agent.py · catalog.py · <b>policy.py</b> · reasoning.py · paypal.py ·
+        mock_paypal.py · receipts.py · renewals.py · grid.py · web.py ·
+        cli.py · api.py · context.py
+      </p>
+    </div>
+    <div class="col">
+      <h2>真实运行输出（demo 场景 1）</h2>
+      <div class="term">
+<span class="c">request      :</span> Birthday gift for my mom, under $50<br>
+<span class="c">status       :</span> <span class="g">COMPLETED</span><br>
+<span class="c">product      :</span> Deluxe Garden Tool Set (G001)<br>
+<span class="c">merchant     :</span> GreenThumb Co<br>
+<span class="c">price        :</span> $34.99　<span class="c">rating:</span> 4.6/5<br>
+<span class="c">policy       :</span> <span class="g">ALLOW (ALL_CHECKS_PASSED)</span><br>
+<span class="c">paypal order :</span> MOCK-ORDER-25413FA805<br>
+<span class="c">capture id   :</span> MOCK-CAPTURE-7361D66DDA<br>
+<br>
+<span class="y">decision trail:</span><br>
+　[PERCEIVE] understood the request via offline engine<br>
+　[SEARCH] ranked 3 candidate(s) from the catalog<br>
+　[SELECT] selected Deluxe Garden Tool Set at $34.99<br>
+　[POLICY] ALLOW - order is within policy<br>
+　[EXPLAIN] ...matches your request on 4 signal(s)...<br>
+　[EXECUTE] created PayPal order <span class="g">(CREATED)</span><br>
+　[CAPTURE] payment <span class="g">COMPLETED</span>
+      </div>
+      <div class="note" style="margin-top:5mm">全部输出为离线 mock 模式实跑结果，无需任何 API Key，评委可直接复现。</div>
+    </div>
+  </div>
+  <div class="foot"><span>PayPilot · Zhiyilang</span><span>2 / 4</span></div>
+</section>
+
+<!-- Page 3: 核心亮点 -->
+<section class="page">
+  <div class="hdr">
+    <h1>核心亮点：护栏是架构隔离，不是提示词</h1>
+    <div class="sub">差异化创新点 · 对应评分维度「专业贴合与创新 25 分」</div>
+  </div>
+  <div class="body">
+    <div class="col">
+      <h2>亮点 1 · 覆写路径对模型不可见</h2>
+      <p>常见做法是把消费规则写进 system prompt，模型可通过多轮对话、角色扮演等方式被说服放行。PayPilot 把策略引擎实现为<b>独立模块</b>，其覆写参数不进入模型的上下文与工具列表——模型在结构上无法触达绕过开关。护栏因此是<b>可证明的</b>，而非需要被信任的。</p>
+      <h2 style="margin-top:6mm">亮点 2 · 事前（pre-flight）而非事后</h2>
+      <p>策略检查发生在调用支付 API <b>之前</b>。不过闸不生成订单、不占用资金，从流程上消除了「先斩后奏」。</p>
+      <h2 style="margin-top:6mm">亮点 3 · 证据可引用</h2>
+      <p>每个候选商品与每条策略判定都引用其所依据的字段（价格、类目、商户、命中信号数），解释不是模型自由发挥，而是<b>绑定证据</b>生成。</p>
+    </div>
+    <div class="col">
+      <h2>亮点 4 · 零依赖 + 完全离线可复现</h2>
+      <ul>
+        <li>纯 Python 标准库，<b>pip install 无内容</b>，评委 `git clone` 即跑。</li>
+        <li>双引擎：OpenAI 兼容 LLM（可接小米 MiMo 等）<b>或</b>确定性离线引擎；模型不可用时自动降级，评测不依赖任何 Key。</li>
+        <li>172 条断言覆盖完整 agent 循环与进程内 PayPal mock。</li>
+      </ul>
+      <h2 style="margin-top:6mm">亮点 5 · 工程交付完备</h2>
+      <ul>
+        <li>OpenAPI 3.0 规范 + Postman 集合</li>
+        <li>Web 界面（web.py）与 HTTP 服务（server.py）</li>
+        <li>render.yaml 云端部署配置</li>
+        <li>MIT 许可，GitHub / Gitee 双公开</li>
+      </ul>
+      <h2 style="margin-top:6mm">落地价值</h2>
+      <p>可直接作为企业「AI 采购助手」「订阅续费管控」的资金安全底座；renewals.py（565 行）已实现订阅续费管理场景，具备真实业务延展性。</p>
+    </div>
+  </div>
+  <div class="foot"><span>PayPilot · Zhiyilang</span><span>3 / 4</span></div>
+</section>
+
+<!-- Page 4: 码道应用说明 -->
+<section class="page">
+  <div class="hdr">
+    <h1>华为云码道（CodeArts）应用说明</h1>
+    <div class="sub">对应评分维度「码道深度使用 25 分」—— 覆盖环境搭建 / 代码生成 / 调试排错 / 文档生成 全流程</div>
+  </div>
+  <div class="body">
+    <div class="col">
+      <h2>码道在开发全流程的覆盖</h2>
+      <table>
+        <tr><th>环节</th><th>码道承担的工作</th><th>产物</th></tr>
+        <tr><td>环境搭建</td><td>生成一键安装脚本与环境自检工具</td><td>scripts/setup.sh · doctor.py</td></tr>
+        <tr><td>代码生成</td><td>新增「商户黑名单模糊匹配」护栏；为检索增加命中明细字段</td><td>policy.py · catalog.py · 新断言</td></tr>
+        <tr><td>调试排错</td><td>定位日累计边界判定不稳定缺陷并修复（定点分比较）</td><td>renewals.py 修复 + 回归断言</td></tr>
+        <tr><td>文档生成</td><td>生成 API 文档、架构说明、部署运行说明</td><td>readme/ 全套 Markdown</td></tr>
+      </table>
+      <h2 style="margin-top:6mm">Prompt 设计要点</h2>
+      <ul>
+        <li>每条提示词<b>明确指定目标文件与现有符号</b>（如 <code>check(policy, product, daily_spent)</code>），避免码道臆造接口。</li>
+        <li>显式声明约束：<b>纯标准库、零依赖、不得引入 LLM 可覆写参数</b>，保证改动不破坏核心安全性质。</li>
+        <li>要求码道<b>同时输出断言代码</b>，使每次生成都受到 172 条回归测试约束。</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h2>使用证明材料（codearts_proof/）</h2>
+      <ul>
+        <li>核心功能开发的 <b>AI 交互对话与 Prompt 截图</b>（A/B/C/D 四组共 6 条）</li>
+        <li>代码生成、重构、排错的<b>过程记录</b></li>
+        <li>码道 IDE 插件<b>操作日志与记录</b></li>
+        <li>每条提示词对应的<b>本地执行终端输出</b>（含 eval.py 结果）</li>
+      </ul>
+      <h2 style="margin-top:6mm">交付规范（5 文件夹）</h2>
+      <p style="font-family:Consolas,monospace;font-size:12px;line-height:1.9">
+        PayPilot_&lt;队名&gt;_v1.0_&lt;联系方式&gt;.zip<br>
+        ├─ ppt/　　　　　　　作品介绍 PDF<br>
+        ├─ project/　　　　　 可运行 Demo<br>
+        ├─ video/　　　　　　 演示视频 21.53s<br>
+        ├─ codearts_proof/　　码道使用证明<br>
+        └─ readme/　　　　　　说明文档
+      </p>
+      <div class="note"><b>真实性声明：</b>全部码道使用痕迹为真实开发过程记录，未做任何合成或伪造。</div>
+    </div>
+  </div>
+  <div class="foot"><span>PayPilot · Zhiyilang</span><span>4 / 4</span></div>
+</section>
+
+</body>
+</html>
